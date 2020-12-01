@@ -103,8 +103,8 @@ book表
 
   ```
   {
-     "status":"1"
-     "msg":"login success"
+     "status":"1",
+     "msg":"login success",
      "data":[{"book_id":"1",
        "book_name":"1984",
        "author":"George Orwel",
@@ -131,7 +131,50 @@ book表
   ```
 
 ### 6.2 注册接口
+- 请求地址 http://120.196.150.196/register
+- 请求方式 POST
+- 请求header
+- 请求body参数
+ |参数名|类型|说明|
+ |username|string|用户名|
+ |password|string|密码|
+ |user_image|file|用户照片|
+- 返回header参数
+- 返回body参数
+|参数|说明|
+|code|1注册成功，0用户已存在,2注册失败|
+|user_id|用户id|
+|msg||
+- 示例
+```
+{
+  "code":"1",
+  "user_id":"119",
+  "msg":"register fail",
+}
+{
+  "code":"0",
+  "user_id":"",
+  "msg":"user already exists"
+}
+{
+"code":"2",
+ "user_id":""
+ "msg":"register failed"
+}
+```
 ### 6.3 人脸登录接口
+- 请求地址 http://120.196.150.196/facelogin
+- 请求方式 POST
+- 请求body参数
+|参数名|类型|说明|是否可控|
+|username|string||不可空|
+|user_face_image|file||不可空|
+- 返回参数
+|参数名|说明|
+|code|0表示不存在，1表示存在但与照片不匹配,2表示存在且匹配|
+|||
+- 示例
 ### 6.4 分页显示接口
 ### 6.5 查询接口
 ### 6.6 下载接口
