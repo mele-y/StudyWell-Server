@@ -1,38 +1,14 @@
 import sqlite3
 import json
-from flask import Flask, redirect, request
-
+from flask import Flask, redirect, request, jsonify
+import os
+from werkzeug.utils import secure_filename
 app = Flask(__name__)
-
+import time
 
 @app.route("/index")
 def index():
     return "<h1 style='color:red'>flaskSql Hello World</h1>"
-
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        conn = sqlite3.connect("StudyWell.db")
-        user_id_temp = str(request.form['user_id'])
-        username_temp = str(request.form['username'])
-        password_temp = str(request.form['password'])
-        image_temp = str(request.form['image'])
-        cursor = conn.cursor()
-        user_list = cursor.execute("select * from user where user.username = ?", (username_temp,))
-        user_list = user_list.fetchall()
-        if len(user_list):
-            ans = "the username has been registerd"
-        else:
-            cursor.execute('insert into user(username,password,user_id,image) values(?,?,?,?)',
-                           (username_temp, password_temp, user_id_temp, image_temp))
-            ans = "register sucessfully"
-            conn.commit()
-        cursor.close()
-        conn.close()
-        return ans
-    else:
-        return "GET"
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -82,26 +58,66 @@ def login():
         return "GET"
 
 
-@app.route('/upload_books', methods=['GET', 'POST'])
-def upload_books():
+@app.route('/upload_book/', methods=['GET', 'POST'])
+def upload_book():
     if request.method == 'POST':
         conn = sqlite3.connect("StudyWell.db")
-        name_temp = str(request.form['name'])
-        id_temp = str(request.form['id'])
-        auther_temp = str(request.form['auther'])
-        publisher_temp = str(request.form['publisher'])
-        publish_time_temp = str(request.form['publish time'])
+        book_name= str(request.form['book_name'])
+        author = str(request.form['author'])
+        publication = str(request.form['publication'])
+        description = str(request.form['description'])
+        publish_date = str(request.form['publish_date'])
+        book_file = request.files['book_file']
+        file_type = str(secure_filename(book_file.filename)).split('.')[-1]
         cursor = conn.cursor()
-        user_list = cursor.execute('insert into books(name, id, auther, publisher, publish time) values(?, ?, ?, ?, ?)',
-                                   (name_temp, id_temp, auther_temp, publisher_temp, publish_time_temp))
-        user_list = user_list.fetchall()
-        ans = ""
+        id_list = cursor.execute("select book_id from book order by book_id desc ").fetchall()
+        max_id = id_list[0][0]+1
+        upload_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        # path in server
+        path ="/www/wwwroot/book/"+str(max_id)+"_"+book_name+"."+file_type
+        # test in localhost
+        #path = str(max_id)+"_"+book_name+"."+file_type
+        book_file.save(path)
+        cursor.execute("insert into book(book_name,book_id,author,publication,publish_date,book_description,book_location,upload_date)"
+                       "values (?,?,?,?,?,?,?,?)",[book_name,max_id,author,publication,publish_date,description,path,upload_date,])
+        conn.commit()
         cursor.close()
         conn.close()
-        return ans
+        return jsonify(msg="upload successfully",code =1 )
     else:
         return "GET"
 
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username_register = request.form['username']
+        password_register = request.form['password']
+        userphoto_register =request.files['user_photo']
+        connection =sqlite3.connect("StudyWell.db")
+        cursor =connection.cursor()
+        user_list = cursor.execute("select * from user where user.username = ?",[username_register,]).fetchall()
+        msg = ""
+        code = 0
+        if len(user_list) == 0:
+            file_type = str(secure_filename(userphoto_register.filename)).split('.')[-1]
+            #path in server
+            path = "/www/wwwroot/user_photo/"+str(username_register)+"."+file_type
+            #test in localhost
+            #path =  str(username_register) + "." + file_type
+            userphoto_register.save(path)
+            code = 1
+            msg = "register successfully"
+            cursor.execute("insert into user(username,password,image) values(?,?,?)",[username_register,password_register,path,])
+            connection.commit()
+        else:
+            code = 0
+            msg = "user  already exists"
+        cursor.close()
+        connection.close()
+        return jsonify(code =code,msg = msg )
+    else:
+        return "only accept post method"
 
 if __name__ == "__main__":
     app.run()
