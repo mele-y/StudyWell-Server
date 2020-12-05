@@ -124,10 +124,12 @@ def register():
 
 @app.route('/query', methods=['GET', 'POST'])
 def query():
-    if request.method == 'POST':
+    if request.method == 'GET':
         query_info = str(request.form['info'])
+        page = int(request.form['page'])
         connection = sqlite3.connect("StudyWell.db")
         cursor = connection.cursor()
+        pages = 0
         book_list = []
         list_1 = cursor.execute("select * from book where book.book_name like '%" + query_info + "%'").fetchall()
         list_2 = cursor.execute("select * from book where book.book_id like '%" + query_info + "%'").fetchall()
@@ -141,6 +143,7 @@ def query():
         for raw in temp:
             book_list.extend(eval(str(raw)))
         book_list = list(set(book_list))  # 去重
+        print(len(book_list))
         if len(book_list) == 0:
             code = 0
             msg = "cant find any books"
@@ -150,23 +153,29 @@ def query():
             code = 1
             msg = 'query success'
             data = []
-            i = 0
-            for book in book_list:
-                if i < 10:
-                    book_info = {
-                        "book_id": book[1],
-                        "book_name": book[0],
-                        "auther": book[2],
-                        "publcation": book[3],
-                        "book_description": book[4],
-                        "publish_date": book[5],
-                        "upload_date": book[6],
-                    }
-                    data.append(book_info)
-                    i += 1
+            if len(book_list) % 10 != 0:
+                pages = int(len(book_list) / 10) + 1
+            else:
+                pages = len(book_list) / 10
+            start = (page - 1) * 10
+            if page == pages:
+                end = len(book_list)
+            else:
+                end = (page - 1) * 10 + 10
+            for i in range(start, end):
+                book_info = {
+                    "book_id": book_list[i][1],
+                    "book_name": book_list[i][0],
+                    "auther": book_list[i][2],
+                    "publcation": book_list[i][3],
+                    "book_description": book_list[i][4],
+                    "publish_date": book_list[i][5],
+                    "upload_date": book_list[i][6],
+                }
+                data.append(book_info)
         cursor.close()
         connection.close()
-        return jsonify(code=code, msg=msg, data=data)
+        return jsonify(code=code, msg=msg, page=page, pages=pages, data=data)
     else:
         return "only accept post method"
 
