@@ -125,8 +125,8 @@ def register():
 @app.route('/query', methods=['GET', 'POST'])
 def query():
     if request.method == 'GET':
-        query_info = str(request.form['info'])
-        page = int(request.form['page'])
+        query_info = str(request.args["info"])
+        page = int(request.args['page'])
         connection = sqlite3.connect("StudyWell.db")
         cursor = connection.cursor()
         pages = 0
@@ -168,11 +168,12 @@ def query():
                 book_info = {
                     "book_id": book_list[i][1],
                     "book_name": book_list[i][0],
-                    "auther": book_list[i][2],
-                    "publcation": book_list[i][3],
-                    "book_description": book_list[i][4],
-                    "publish_date": book_list[i][5],
-                    "upload_date": book_list[i][6],
+                    "author": book_list[i][2],
+                    "publication": book_list[i][3],
+                    "publish_date": book_list[i][4],
+                    "book_description": book_list[i][5],
+                    "book location": book_list[i][6],
+                    "upload_date": book_list[i][7],
                 }
                 data_book.append(book_info)
         cursor.close()
@@ -182,7 +183,7 @@ def query():
         data["data_book"] = data_book
         return jsonify(code=code, msg=msg, data=data)
     else:
-        return "only accept post method"
+        return "only accept get method"
 
 
 @app.route("/download_book/")
