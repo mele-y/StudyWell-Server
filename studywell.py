@@ -1,6 +1,6 @@
 import sqlite3
 import json
-from flask import Flask, redirect, request, jsonify,send_file,send_from_directory
+from flask import Flask, redirect, request, jsonify, send_file, send_from_directory
 import os
 from werkzeug.utils import secure_filename
 
@@ -143,17 +143,19 @@ def query():
         for raw in temp:
             book_list.extend(eval(str(raw)))
         book_list = list(set(book_list))  # 去重
-        print(len(book_list))
+        data = {}
+        print(book_list)
         if len(book_list) == 0:
             code = 0
             msg = "cant find any books"
-            data = []
+            data_book = []
             connection.commit()
         else:
             code = 1
             msg = 'query success'
-            data = []
+            data_book = []
             if len(book_list) % 10 != 0:
+
                 pages = int(len(book_list) / 10) + 1
             else:
                 pages = len(book_list) / 10
@@ -172,25 +174,28 @@ def query():
                     "publish_date": book_list[i][5],
                     "upload_date": book_list[i][6],
                 }
-                data.append(book_info)
+                data_book.append(book_info)
         cursor.close()
         connection.close()
-        return jsonify(code=code, msg=msg, page=page, pages=pages, data=data)
+        data["page"] = page
+        data["pages"] = pages
+        data["data_book"] = data_book
+        return jsonify(code=code, msg=msg, data=data)
     else:
         return "only accept post method"
 
 
 @app.route("/download_book/")
 def download_book():
-        book_id = request.args.get('book_id')
-        conn =sqlite3.connect("StudyWell.db")
-        cursor =conn.cursor()
-        path_list = cursor.execute("select book_location from book where book.book_id = ?",[book_id,]).fetchall()
-        path = path_list[0][0]
-        file_dir,str,file_name = path.rpartition("/")
-        cursor.close()
-        conn.close()
-        return send_from_directory(file_dir,file_name,as_attachment = True)
+    book_id = request.args.get('book_id')
+    conn = sqlite3.connect("StudyWell.db")
+    cursor = conn.cursor()
+    path_list = cursor.execute("select book_location from book where book.book_id = ?", [book_id, ]).fetchall()
+    path = path_list[0][0]
+    file_dir, str, file_name = path.rpartition("/")
+    cursor.close()
+    conn.close()
+    return send_from_directory(file_dir, file_name, as_attachment=True)
 
 
 if __name__ == "__main__":
