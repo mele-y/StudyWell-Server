@@ -1,7 +1,8 @@
 import sqlite3
 import json
-from flask import Flask, redirect, request, jsonify,send_file,send_from_directory, render_template
+from flask import Flask, redirect, request, jsonify, send_file, send_from_directory, render_template, url_for
 import os
+import shutil
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -62,49 +63,36 @@ def login():
 @app.route('/upload_book', methods=['GET', 'POST'])
 def upload_book():
     if request.method == 'POST':
-        conn = sqlite3.connect("StudyWell.db")
+        conn=sqlite3.connect("StudyWell.db")
         book_name = str(request.form['book_name'])
         author = str(request.form['author'])
         publication = str(request.form['publication'])
         description = str(request.form['description'])
         publish_date = str(request.form['publish_date'])
         book_file = request.files['book_file']
-        catagory = str(request.form['catagory'])
+        book_cover = request.files['book_cover']
+        category = str(request.form['category'])
+        upload_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         file_type = str(secure_filename(book_file.filename)).split('.')[-1]
         cursor = conn.cursor()
-        id_list = cursor.execute("select book_id from book order by book_id desc ").fetchall()
-        if len(id_list) != 0:
-        	max_id = id_list[0][0] + 1
+        id_list =cursor.execute("select book_id from temporary order by book_id desc").fetchall()
+        if len(id_list)!=0:
+           max_id = id_list[0][0]+1
         else:
-            max_id = 1 
-        upload_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-
-        book_cover = request.files['book_cover']
-        if book_cover.content_type==None:
-            book_cover_URL = "http://121.196.150.190/static/book_cover/defalut.jpg"
-        else:
-            book_cover_type =str(secure_filename(book_cover.filename)).split('.')[-1]
-            book_cover_URL =  "http://121.196.150.190/static/book_cover/"+str(max_id) + "_" + book_name + "." + book_cover_type
-            cover_path = "/www/wwwroot/test/static/book_cover/"+str(max_id) + "_" + book_name + "." + book_cover_type
-        # path in server
-        path = "/www/wwwroot/book/" + str(max_id) + "_" + book_name + "." + file_type
-        
-        # test in localhost
-        #path = str(max_id)+"_"+book_name+"."+file_type
-        book_file.save(path)
-        if book_cover.content_type != None:
-            book_cover.save(cover_path)
-        cursor.execute(
-            "insert into book(book_name,book_id,author,publication,publish_date,book_description,book_location,upload_date,book_cover_url,catagory)"
-            "values (?,?,?,?,?,?,?,?,?,?)",
-            [book_name, max_id, author, publication, publish_date, description, path, upload_date,book_cover_URL,catagory])
+           max_id = 1
+        book_cover_type = str(secure_filename(book_cover.filename)).split('.')[-1]
+        cover_path ="/www/wwwroot/test/temporary/book_cover/"+str(max_id)+"_"+book_name+"."+book_cover_type
+        book_path = "/www/wwwroot/test/temporary/bookfile/"+str(max_id)+"_"+book_name+"."+file_type
+        book_file.save(book_path)
+        book_cover.save(cover_path)
+        cursor.execute("insert into temporary(book_name,book_id,author,publication,publish_date,book_description,upload_date,book_path,cover_path,category) "
+                       "values (?,?,?,?,?,?,?,?,?,?)",[book_name,max_id,author,publication,publish_date,description,upload_date,book_path,cover_path,category])
         conn.commit()
         cursor.close()
         conn.close()
-        return jsonify(msg="upload successfully", code=1)
+        return jsonify(msg="等待审核", code=1)
     else:
         return "GET"
-
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -207,11 +195,85 @@ def download_book():
         return send_from_directory(file_dir,file_name,as_attachment = True)
 
 @app.route("/manage")
-def all_the_book():
+def manage():
     conn = sqlite3.connect("StudyWell.db")
     cursor = conn.cursor()
-    book_list = cursor.execute()
+    book_list = cursor.execute("select * from book").fetchall()
+    temporary_list = cursor.execute("select * from temporary").fetchall()
+    cursor.close()
+    conn.close()
+    return render_template('admin.html',book_list=book_list,temporary_list=temporary_list)
 
+@app.route("/delete/<int:book_id>",methods=['POST'])
+def delete_book(book_id):
+    conn=sqlite3.connect("StudyWell.db")
+    print(book_id)
+    cursor=conn.cursor()
+    cursor.execute("delete from book where book.book_id = ?",[book_id,])
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for('manage'))
+
+@app.route("/delete_temporary/<int:id>",methods=['POST'])
+def delete_temporary(id):
+    conn=sqlite3.connect("StudyWell.db")
+    cursor=conn.cursor()
+    item_list = cursor.execute("select * from temporary where temporary.book_id = ? ",[id,]).fetchall()
+    item = item_list[0]
+    book_path = item[8]
+    cover_path = item[9]
+    if os.path.exists(book_path):
+        os.remove(book_path)
+    if os.path.exists(cover_path):
+        os.remove(cover_path)
+    cursor.execute("delete from temporary where temporary.book_id = ?",[id,])
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for('manage'))
+    
+    
+@app.route("/accept_temporary/<int:id>",methods=['POST'])
+def accept_temporary(id):
+    conn = sqlite3.connect("StudyWell.db")
+    cursor = conn.cursor()
+    item_list = cursor.execute("select * from temporary where temporary.book_id = ?",[id,]).fetchall()
+    item = item_list[0]
+    cursor.execute("delete from temporary where temporary.book_id = ?",[id,])
+    book_name =item[0]
+    old_id =item[1]
+    author = item[2]
+    publication =item[3]
+    publish_date = item[4]
+    book_description = item[5]
+    upload_date = item[6]
+    category = item[7]
+    book_path = item[8]
+    cover_path = item[9]
+    id_list = cursor.execute("select book_id from book order by book_id desc").fetchall()
+    if len(id_list) != 0:
+        max_id = id_list[0][0] + 1
+    else:
+        max_id = 1
+    bookfile_type = book_path.split('.')[-1]
+    covertype = cover_path.split('.')[-1]
+    shutil.move(book_path,"/www/wwwroot/book")
+    shutil.move(cover_path,"/www/wwwroot/test/static/book_cover")
+    path="/www/wwwroot/book/"+str(max_id)+"_"+book_name+"."+bookfile_type
+    book_cover_URL="http://121.196.150.190/static/book_cover/"+str(max_id)+"_"+book_name+"."+covertype
+    os.rename("/www/wwwroot/book/"+str(old_id)+"_"+book_name+"."+bookfile_type,path)
+    os.rename("/www/wwwroot/test/static/book_cover/"+str(old_id)+"_"+book_name+"."+covertype,"/www/wwwroot/test/static/book_cover/"+str(max_id)+"_"+book_name+"."+covertype)
+    cursor.execute(
+        "insert into book(book_name,book_id,author,publication,publish_date,book_description,book_location,upload_date,book_cover_url,category)"
+        "values (?,?,?,?,?,?,?,?,?,?)",
+        [book_name, max_id, author, publication, publish_date, book_description, path, upload_date, book_cover_URL,
+         category])
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for('manage'))
+    
 if __name__ == "__main__":
     app.run()
 # books = {}
